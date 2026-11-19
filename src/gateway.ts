@@ -9,8 +9,8 @@
  * 검사 (통과 못 하면 게임 서버까지 가지 않는다)
  *   - GET/HEAD 외의 메서드                       405
  *   - 없는 게임                                   주소창 직접 접속이면 사이트로, 아니면 404
- *   - 게임 화면을 주소창에서 직접 연 경우         사이트의 해당 테스트 페이지로 이동
- *   - 허용되지 않은 사이트가 iframe으로 띄운 경우  403 안내 화면
+ *   - 게임 화면을 주소창에서 직접 연 경우         403 부정 사용 안내 (위블에서 플레이하기 → 사이트 테스트 페이지)
+ *   - 허용되지 않은 사이트가 iframe으로 띄운 경우  403 같은 안내 (버튼은 새 탭)
  *   - 다른 사이트가 에셋을 직접 가져가는 경우      403
  *
  * 게임 서버 쪽 오류
@@ -22,7 +22,7 @@
  */
 import type { HubConfig, ResolvedGame } from "./config.ts";
 import { dashboardPage } from "./dashboard.ts";
-import { blockedPage, errorPage, html, notFoundPage } from "./pages.ts";
+import { errorPage, gatePage, html, notFoundPage } from "./pages.ts";
 
 type Fetch = (input: URL, init: RequestInit) => Promise<Response>;
 
@@ -104,15 +104,15 @@ function isTopLevel(request: Request, dest: string | null): boolean {
 
 function checkDocument(request: Request, url: URL, dest: string | null, game: ResolvedGame, config: HubConfig): Block | null {
   if (isTopLevel(request, dest)) {
-    const target = `${config.siteUrl}/t/${encodeURIComponent(game.siteSlug)}`;
-    return { reason: "direct-open", response: Response.redirect(target, 302) };
+    return { reason: "direct-open", response: html(gatePage(config, game, { newTab: false }), 403, frameHeaders(config)) };
   }
 
   const refererOrigin = originOf(request.headers.get("referer"));
   // 허브 자신(첫 화면의 미리보기, 게임 안의 이동)은 허용. 다른 사이트의 iframe은 CSP frame-ancestors가 한 번 더 막는다
   const allowed = refererOrigin !== null && (refererOrigin === url.origin || config.allowedEmbedders.includes(refererOrigin));
   if (!allowed) {
-    return { reason: `foreign-embedder:${refererOrigin ?? "none"}`, response: html(blockedPage(config, game), 403) };
+    // 낯선 페이지 안에서도 안내가 보이도록 frame-ancestors는 붙이지 않는다
+    return { reason: `foreign-embedder:${refererOrigin ?? "none"}`, response: html(gatePage(config, game, { newTab: true }), 403) };
   }
   return null;
 }

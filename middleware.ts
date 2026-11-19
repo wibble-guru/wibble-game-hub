@@ -5,8 +5,11 @@
 import { loadConfig } from "./src/config.ts";
 import { handle } from "./src/gateway.ts";
 
-const config = loadConfig(process.env);
+const hubConfig = loadConfig(process.env);
 
 export default function middleware(request: Request): Promise<Response> {
-  return handle(request, config);
+  return handle(request, hubConfig);
 }
+
+/** 안내 화면의 이미지·글꼴(public/_hub/)은 미들웨어를 거치지 않고 정적으로 나간다 */
+export const config = { matcher: ["/((?!_hub/).*)"] };

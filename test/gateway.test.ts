@@ -93,24 +93,30 @@ describe("허용되는 요청", () => {
 });
 
 describe("막는 요청", () => {
-  it("게임 화면을 주소창에서 직접 열면 사이트의 테스트 페이지로", async () => {
+  it("게임 화면을 주소창에서 직접 열면 403 부정 사용 안내 (버튼은 같은 탭으로 사이트 테스트 페이지)", async () => {
     const up = ok();
     const res = await handle(req("/court/", { "sec-fetch-dest": "document", "sec-fetch-site": "none", accept: "text/html" }), config, up.fetchImpl);
-    assert.equal(res.status, 302);
-    assert.equal(res.headers.get("location"), `${SITE}/t/court`);
+    assert.equal(res.status, 403);
+    const body = await res.text();
+    assert.match(body, /위블에서 만나요/);
+    assert.match(body, new RegExp(`<a class="btn" href="${SITE}/t/court">`));
     assert.equal(up.calls.length, 0, "게임 서버까지 가지 않는다");
   });
 
-  it("Sec-Fetch가 없는 오래된 브라우저 + Referer 없음 → 직접 접속으로 보고 사이트로", async () => {
+  it("Sec-Fetch가 없는 오래된 브라우저 + Referer 없음 → 직접 접속으로 보고 안내", async () => {
     const res = await handle(req("/court/", { accept: "text/html" }), config, ok().fetchImpl);
-    assert.equal(res.status, 302);
+    assert.equal(res.status, 403);
+    assert.match(await res.text(), /위블에서 만나요/);
   });
 
-  it("다른 사이트가 iframe으로 띄우면 403 안내 화면", async () => {
+  it("다른 사이트가 iframe으로 띄우면 같은 안내, 버튼은 새 탭 · 안내가 보이도록 frame-ancestors 없음", async () => {
     const up = ok();
     const res = await handle(req("/court/", iframeHeaders("https://evil.example/page")), config, up.fetchImpl);
     assert.equal(res.status, 403);
-    assert.match(await res.text(), /위블에서 만나요/);
+    assert.equal(res.headers.get("content-security-policy"), null);
+    const body = await res.text();
+    assert.match(body, /위블에서 만나요/);
+    assert.match(body, /target="_blank" rel="noopener"/);
     assert.equal(up.calls.length, 0);
   });
 
