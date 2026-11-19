@@ -18,7 +18,6 @@ export const GAMES: GameEntry[] = [
     slug: "court",
     title: "위블 법정",
     siteSlug: "court",
-    // TODO: wibble-court Vercel 프로젝트의 Domains 탭에 있는 실제 운영 주소로 바꾸기
-    upstream: "https://wibble-court.vercel.app",
+    upstream: "https://wibble-court-ten.vercel.app",
   },
 ];
