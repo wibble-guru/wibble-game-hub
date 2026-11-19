@@ -1,0 +1,17 @@
+{
+  "name": "wibble-game-hub",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env.local scripts/dev.ts",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit"
+  },
+  "packageManager": "pnpm@11.24.0",
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^7.0.2"
+  }
+}
