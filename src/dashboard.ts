@@ -77,11 +77,13 @@ const PAGE = `<!doctype html>
   .bar label { display: inline-flex; gap: 6px; align-items: center; }
   .bar button, .bar select, .bar a { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); text-decoration: none; cursor: pointer; }
   .stage { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-  .stage figure { margin: 0; display: grid; gap: 6px; }
+  .stage figure { margin: 0; display: grid; gap: 6px; min-width: 0; }
+  .stage figure.mobile { flex: 0 1 351px; }
+  .stage figure.desktop { flex: 1 1 480px; }
   .stage figcaption { color: var(--ink-2); font-size: 12px; }
-  iframe { border: 0; border-radius: 14px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); display: block; }
-  .mobile { width: 375px; height: 720px; max-width: 100%; }
-  .desktop { width: min(960px, 100%); aspect-ratio: 16 / 9; }
+  /* 게임은 사이트와 같은 실제 크기로 그리고, 화면에 맞게 축소만 한다 (게임의 미디어 쿼리가 실제와 같게) */
+  .screen { position: relative; width: 100%; overflow: hidden; border-radius: 14px; background: var(--surface); box-shadow: 0 0 0 1px var(--line); }
+  .screen iframe { position: absolute; top: 0; left: 0; border: 0; transform-origin: 0 0; display: block; }
   pre { margin: 0; padding: 12px; border-radius: 10px; background: #1d2433; color: #cfe; max-height: 180px; overflow: auto; white-space: pre-wrap; }
   @media (max-width: 720px) { .wrap { grid-template-columns: 1fr; } nav { border-right: 0; border-bottom: 1px solid var(--line); grid-auto-flow: column; overflow-x: auto; } }
 </style>
@@ -110,6 +112,26 @@ const PAGE = `<!doctype html>
   const $ = (s) => document.querySelector(s);
   let current = GAMES[0];
 
+  // 위블 사이트의 실제 게임 영역 크기
+  //   모바일: 375×812 기기에서 좌우 여백 12px·상단 76px을 뺀 크기
+  //   PC: 1200px 컨테이너에서 좌우 여백 24px을 뺀 16:9 (넓은 화면 기준 최대)
+  const VIEWPORTS = [
+    { id: "mobile", label: "모바일", w: 351, h: 736 },
+    { id: "desktop", label: "PC 16:9", w: 1152, h: 648 },
+  ];
+
+  // 미리보기 칸 너비에 맞춰 iframe을 축소 (확대는 하지 않음)
+  const fit = new Map();
+  const observer = new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const item = fit.get(entry.target);
+      if (!item) continue;
+      const scale = Math.min(1, entry.contentRect.width / item.v.w);
+      item.frame.style.transform = "scale(" + scale + ")";
+      item.cap.textContent = item.v.label + " " + item.v.w + "×" + item.v.h + (scale < 1 ? " · " + Math.round(scale * 100) + "%" : "");
+    }
+  });
+
   function log(msg) {
     $("#log").textContent = new Date().toLocaleTimeString() + " " + msg + "\\n" + $("#log").textContent;
   }
@@ -132,19 +154,27 @@ const PAGE = `<!doctype html>
     if (!current) { $("#stage").textContent = "등록된 게임이 없어요 (src/games.ts)"; return; }
     $("#site-link").href = SITE + "/t/" + encodeURIComponent(current.siteSlug);
     const view = $("#view").value;
-    const frames = [];
-    if (view !== "desktop") frames.push(["mobile", "모바일 375×720"]);
-    if (view !== "mobile") frames.push(["desktop", "PC 16:9"]);
-    $("#stage").replaceChildren(...frames.map(([cls, label]) => {
+    observer.disconnect();
+    fit.clear();
+    const frames = VIEWPORTS.filter((v) => view === "both" || view === v.id);
+    $("#stage").replaceChildren(...frames.map((v) => {
       const fig = document.createElement("figure");
+      fig.className = v.id;
+      const screen = document.createElement("div");
+      screen.className = "screen";
+      screen.style.aspectRatio = v.w + " / " + v.h;
+      screen.style.maxWidth = v.w + "px";
       const f = document.createElement("iframe");
-      f.className = cls;
-      f.title = current.title + " · " + label;
+      f.width = v.w;
+      f.height = v.h;
+      f.title = current.title + " · " + v.label;
       f.allow = "autoplay; fullscreen; clipboard-write; web-share";
       f.src = "/" + current.slug + "/?run=" + Date.now();
       const cap = document.createElement("figcaption");
-      cap.textContent = label;
-      fig.append(f, cap);
+      screen.append(f);
+      fig.append(screen, cap);
+      fit.set(screen, { frame: f, cap, v });
+      observer.observe(screen);
       return fig;
     }));
     log("[" + current.slug + "] 불러오는 중 (theme=" + $("#theme").value + ")");
